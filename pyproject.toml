@@ -1,7 +1,7 @@
 [project]
 name = "starbucks-mcp"
 version = "0.1.0"
-description = "Starbucks MCP Server Demo - AI Agent Coffee Ordering"
+description = "Starbucks China B2B Open Platform MCP Adapter"
 requires-python = ">=3.13"
 dependencies = [
     "mcp[cli]>=1.9.0",

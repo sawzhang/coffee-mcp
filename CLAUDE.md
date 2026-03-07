@@ -1,68 +1,70 @@
-# CLAUDE.md - Starbucks MCP Server
+# CLAUDE.md
 
-## Project Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Starbucks China B2B MCP Server — maps AI Agent requests (via MCP protocol) to existing HTTP Open Platform APIs at `openapi.starbucks.com.cn`. Deployed behind Kong gateway which handles all auth/rate-limiting/ACL.
+## What This Is
 
-## Tech Stack
+MCP adapter for Starbucks China's B2B HTTP Open Platform (`openapi.starbucks.com.cn`). Every MCP Tool maps 1:1 to an existing HTTP API endpoint. In production, this service sits behind Kong which handles all auth (HMAC-SHA256/SM2), rate limiting, IP whitelisting, and ACL. The adapter only does MCP protocol handling + semantic formatting.
 
-- **Language**: Python 3.13
-- **Package Manager**: uv
-- **MCP SDK**: `mcp[cli]` (FastMCP)
-- **HTTP Client**: httpx
-- **CLI**: click + rich
+Currently in demo mode with mock data. No real backend calls yet.
 
-## Project Structure
-
-```
-starbucks-mcp/
-├── pyproject.toml
-├── src/starbucks_mcp/
-│   ├── server.py        # MCP Server — 10 Phase-1 tools + 2 resources
-│   ├── mock_data.py     # Mock data simulating real API responses
-│   ├── formatters.py    # Semantic formatters (JSON → natural language)
-│   └── cli.py           # CLI client (interactive + demo + single commands)
-└── docs/
-    ├── index.html        # GitHub Pages site
-    ├── ARCHITECTURE.md   # Full API mapping & phased rollout
-    └── DEPLOY_DECISION.md # Kong-based deployment analysis
-```
-
-## Key Commands
+## Commands
 
 ```bash
-uv sync                            # Install dependencies
-uv run sbux demo                   # Run 9-step demo flow
-uv run sbux interactive            # Interactive REPL
-uv run sbux member SBUX_M_100001   # Query member
-uv run starbucks-mcp               # Run MCP server (stdio)
+uv sync                              # install deps
+uv run sbux demo                     # 9-step B2B demo (starts MCP server internally)
+uv run sbux interactive              # REPL mode (type 'data' for test IDs, 'help' for commands)
+uv run sbux member SBUX_M_100001     # single tool call
+uv run starbucks-mcp                 # run MCP server (stdio mode, for client integration)
+```
+
+Run the full MCP protocol test suite (33 cases: tools + resources + edge cases):
+```bash
+uv run python tests/test_mcp_real.py
 ```
 
 ## Architecture
 
-MCP Adapter sits behind Kong as a new upstream:
-- **Kong**: HMAC auth, IP whitelist, rate limiting, ACL (existing infra, 2 new routes)
-- **MCP Adapter** (this project): protocol conversion + semantic formatting only
-- **Backend**: existing openapi-platform services (zero changes)
+```
+server.py          10 @mcp.tool() functions + 2 @mcp.resource() functions
+    │                  Each tool docstring notes the corresponding HTTP API path
+    │                  Tools have NO auth params (Kong handles auth upstream)
+    ├── mock_data.py   Query functions that return dicts (swap for real httpx calls in prod)
+    └── formatters.py  dict → markdown string (semantic formatting for LLM consumption)
 
-## 10 Phase-1 Tools (all read-only)
+cli.py             Click CLI that spawns server.py as a subprocess via MCP stdio_client
+```
 
-All map 1:1 to real HTTP APIs:
-- `member_query` → POST /crmadapter/account/query
-- `member_tier` → POST /crmadapter/account/memberTier
-- `member_benefits` → POST /crmadapter/customers/getBenefits
-- `member_benefit_list` → POST /crmadapter/asset/coupon/getBenefitList
-- `coupon_query` → POST /coupon/query
-- `coupon_detail` → POST /coupon/detail
-- `equity_query` → POST /equity/query
-- `equity_detail` → POST /equity/detail
-- `assets_list` → POST /assets/list
-- `cashier_pay_query` → POST /cashier/payQuery
+**Data flow per tool call:** MCP request → `server.py` tool function → `mock_data.query_fn()` → dict → `formatters.format_fn()` → markdown string → MCP response
+
+**Production deployment:** Agent → Kong (`/sse`, `/mcp` routes, HMAC auth plugin) → this adapter → backend via internal network
+
+## Tool ↔ HTTP API Mapping
+
+| Tool | HTTP Endpoint |
+|------|--------------|
+| `member_query` | POST /crmadapter/account/query |
+| `member_tier` | POST /crmadapter/account/memberTier |
+| `member_benefits` | POST /crmadapter/customers/getBenefits |
+| `member_benefit_list` | POST /crmadapter/asset/coupon/getBenefitList |
+| `coupon_query` | POST /coupon/query |
+| `coupon_detail` | POST /coupon/detail |
+| `equity_query` | POST /equity/query |
+| `equity_detail` | POST /equity/detail |
+| `assets_list` | POST /assets/list |
+| `cashier_pay_query` | POST /cashier/payQuery |
+
+## Demo Test Data IDs
+
+Members: `SBUX_M_100001` (Gold/NIO), `SBUX_M_100002` (Green/Fliggy), `SBUX_M_100003` (Diamond/Qwen)
+Coupons: `SBX20260301A001`, `SBX20260301A002`, `SBX20260215B001`
+Orders: `ORD_2026030100001`, `ORD_2026021500001`
+Equity: `EQ_2026030100001`, `EQ_2026030100002`, `EQ_2026021500001`
+Pay tokens: `PAY_TOKEN_001` (success), `PAY_TOKEN_002` (pending), `PAY_TOKEN_003` (failed)
 
 ## Code Conventions
 
-- Tools have NO auth parameters (Kong handles auth before traffic reaches adapter)
-- Chinese user-facing strings, English code/comments
-- All tool functions return formatted natural language strings
-- Mock data mirrors real API response schemas
-- Type hints everywhere (Python 3.13 union syntax)
+- Chinese user-facing strings in tool responses; English in code/comments
+- Python 3.13 union syntax (`str | None`, not `Optional[str]`)
+- Every tool returns a formatted markdown string, never raw JSON
+- `mock_data.py` functions mirror the real API response shapes — when replacing with real HTTP calls, keep the same return types

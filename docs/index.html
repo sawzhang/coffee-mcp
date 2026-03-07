@@ -230,7 +230,7 @@ B2B Agent (NIO / Qwen / Fliggy / Custom)
       <tr><th>Phase</th><th>Tools</th><th>Type</th><th>Timeline</th></tr>
       <tr>
         <td><span class="phase-tag phase-1">Phase 1</span></td>
-        <td>member_query, member_tier, member_benefits, coupon_query, coupon_detail, equity_query, equity_detail, assets_list, cashier_pay_query</td>
+        <td>member_query, member_tier, member_benefits, member_benefit_list, coupon_query, coupon_detail, equity_query, equity_detail, assets_list, cashier_pay_query</td>
         <td>Read-only</td>
         <td>Week 1-2</td>
       </tr>
@@ -278,6 +278,16 @@ B2B Agent (NIO / Qwen / Fliggy / Custom)
     <div class="steps">
       <div class="step">
         <div class="step-num">3</div>
+        <div class="step-content"><h4>Run Tests</h4><p>33 real MCP protocol tests (stdio client, tools + resources + edge cases)</p></div>
+      </div>
+    </div>
+    <div class="code-block">
+<span class="cmd">$</span> uv run python tests/test_mcp_real.py
+<span class="comment"># Total: 33  |  Passed: 33  |  Failed: 0</span>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">4</div>
         <div class="step-content"><h4>Connect AI Agent</h4><p>Add to Claude Code or Cursor MCP config</p></div>
       </div>
     </div>
@@ -330,7 +340,8 @@ B2B Agent (NIO / Qwen / Fliggy / Custom)
       Starbucks MCP Server &mdash; B2B Open Platform |
       <a href="https://github.com/sawzhang/starbucks-mcp-server">GitHub</a> |
       <a href="https://github.com/sawzhang/starbucks-mcp-server/blob/main/docs/ARCHITECTURE.md">Architecture Doc</a> |
-      <a href="https://github.com/sawzhang/starbucks-mcp-server/blob/main/docs/DEPLOY_DECISION.md">Deploy Decision</a>
+      <a href="https://github.com/sawzhang/starbucks-mcp-server/blob/main/docs/DEPLOY_DECISION.md">Deploy Decision</a> |
+      <a href="https://github.com/sawzhang/starbucks-mcp-server/blob/main/docs/proposal.md">Proposal</a>
     </p>
     <p style="margin-top:8px;">MIT License &copy; 2026</p>
   </footer>
