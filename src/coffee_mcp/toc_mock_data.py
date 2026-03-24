@@ -29,12 +29,27 @@ def _random_id(prefix: str) -> str:
 # Confirmation Token Store (prevents skipping price confirmation)
 # ---------------------------------------------------------------------------
 
-_CONFIRMATION_TOKENS: dict[str, dict] = {}  # token → {created_at, ...}
+_CONFIRMATION_TOKENS: dict[str, dict] = {}  # token → {created_at, used}
 _CONFIRMATION_TOKEN_TTL = 300  # 5 minutes
+_CONFIRMATION_LAST_CLEANUP: float = 0.0
+
+
+def _cleanup_expired_tokens() -> None:
+    """Remove expired/used tokens to prevent memory accumulation."""
+    global _CONFIRMATION_LAST_CLEANUP
+    now = time.monotonic()
+    if now - _CONFIRMATION_LAST_CLEANUP < 60:  # cleanup at most every 60s
+        return
+    stale = [k for k, v in _CONFIRMATION_TOKENS.items()
+             if v["used"] or now - v["created_at"] > _CONFIRMATION_TOKEN_TTL * 2]
+    for k in stale:
+        del _CONFIRMATION_TOKENS[k]
+    _CONFIRMATION_LAST_CLEANUP = now
 
 
 def _generate_confirmation_token() -> str:
     """Generate a one-time confirmation token for L3 operations."""
+    _cleanup_expired_tokens()
     token = f"cfm_{uuid.uuid4().hex[:12]}"
     _CONFIRMATION_TOKENS[token] = {"created_at": time.monotonic(), "used": False}
     return token
@@ -58,17 +73,38 @@ def validate_confirmation_token(token: str) -> str | None:
 # Idempotency Store (prevents duplicate L3 operations)
 # ---------------------------------------------------------------------------
 
-_IDEMPOTENCY_STORE: dict[str, dict] = {}  # key → result
+_IDEMPOTENCY_STORE: dict[str, dict] = {}  # key → {result, created_at}
+_IDEMPOTENCY_TTL = 86400  # 24 hours
+_IDEMPOTENCY_LAST_CLEANUP: float = 0.0
+
+
+def _cleanup_expired_idempotency() -> None:
+    """Remove expired idempotency entries to prevent memory accumulation."""
+    global _IDEMPOTENCY_LAST_CLEANUP
+    now = time.monotonic()
+    if now - _IDEMPOTENCY_LAST_CLEANUP < 300:  # cleanup at most every 5min
+        return
+    stale = [k for k, v in _IDEMPOTENCY_STORE.items()
+             if isinstance(v, dict) and v.get("_created_at")
+             and now - v["_created_at"] > _IDEMPOTENCY_TTL]
+    for k in stale:
+        del _IDEMPOTENCY_STORE[k]
+    _IDEMPOTENCY_LAST_CLEANUP = now
 
 
 def _check_idempotency(key: str) -> dict | None:
     """Check if an operation was already performed. Returns cached result or None."""
-    return _IDEMPOTENCY_STORE.get(key)
+    _cleanup_expired_idempotency()
+    entry = _IDEMPOTENCY_STORE.get(key)
+    if entry is None:
+        return None
+    # Return a copy without internal metadata
+    return {k: v for k, v in entry.items() if not k.startswith("_")}
 
 
 def _save_idempotency(key: str, result: dict) -> None:
-    """Save result for idempotency deduplication."""
-    _IDEMPOTENCY_STORE[key] = result
+    """Save result for idempotency deduplication with TTL metadata."""
+    _IDEMPOTENCY_STORE[key] = {**result, "_created_at": time.monotonic()}
 
 
 # ---------------------------------------------------------------------------
