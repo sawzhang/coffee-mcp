@@ -9,7 +9,7 @@ PII masking applied in list views (phone numbers masked as 138****1234).
 
 from datetime import datetime
 
-from . import toc_mock_data as tmd
+from .utils import mask_phone
 
 
 # ---------------------------------------------------------------------------
@@ -171,9 +171,10 @@ def format_store_detail(store: dict) -> str:
 # Menu — standard + compact modes
 # ---------------------------------------------------------------------------
 
-def format_menu(data: dict) -> str:
+def format_menu(data: dict, size_options: dict | None = None) -> str:
     if "error" in data:
         return data["error"]
+    size_opts = size_options or {}
     lines = [f"**{data['store_name']} 菜单**\n"]
     for cat in data["categories"]:
         cat_items = [i for i in data["items"] if i["category"] == cat["code"]]
@@ -183,7 +184,7 @@ def format_menu(data: dict) -> str:
         for item in cat_items:
             new_tag = " 🆕" if item.get("is_new") else ""
             sizes = "/".join(
-                tmd.SIZE_OPTIONS[s]["name"]
+                size_opts.get(s, {}).get("name", s)
                 for s in item.get("available_sizes", [])
             ) or "单一规格"
             lines.append(
@@ -194,17 +195,18 @@ def format_menu(data: dict) -> str:
     return "\n".join(lines)
 
 
-def format_menu_compact(data: dict) -> str:
+def format_menu_compact(data: dict, size_options: dict | None = None) -> str:
     """Compact menu format — minimizes token consumption."""
     if "error" in data:
         return data["error"]
+    size_opts = size_options or {}
     lines = [f"**{data['store_name']} 菜单**\n"]
     lines.append("商品|价格|杯型|编号")
     lines.append("---|---|---|---")
     for item in data["items"]:
         new_tag = "🆕" if item.get("is_new") else ""
         sizes = "/".join(
-            tmd.SIZE_OPTIONS[s]["name"]
+            size_opts.get(s, {}).get("name", s)
             for s in item.get("available_sizes", [])
         ) or "单一"
         lines.append(f"{item['name']}{new_tag}|¥{item['base_price']}起|{sizes}|`{item['product_code']}`")
@@ -421,7 +423,7 @@ def format_delivery_addresses(addresses: list[dict]) -> str:
     lines = [f"**我的配送地址**（共 {len(addresses)} 个）\n"]
     for a in addresses:
         default = " [默认]" if a.get("is_default") else ""
-        masked_phone = tmd.mask_phone(a["phone"])
+        masked_phone = mask_phone(a["phone"])
         lines.append(
             f"- **{a['contact_name']}** {masked_phone}{default}\n"
             f"  {a['city']} {a['address']} {a['address_detail']}\n"

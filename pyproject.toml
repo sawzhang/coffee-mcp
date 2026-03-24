@@ -1,18 +1,20 @@
 [project]
 name = "coffee-company-mcp"
 version = "0.1.0"
-description = "Coffee Company B2B Open Platform MCP Adapter"
+description = "Multi-brand MCP platform for coffee & tea ordering"
 requires-python = ">=3.13"
 dependencies = [
     "mcp[cli]>=1.9.0",
     "httpx>=0.28.0",
     "click>=8.1.0",
     "rich>=13.0.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
 coffee-company-mcp = "coffee_mcp.server:main"
 coffee-company-toc = "coffee_mcp.toc_server:main"
+coffee-company-toc-http = "coffee_mcp.toc_server:main_http"
 coffee = "coffee_mcp.cli:cli"
 
 [build-system]

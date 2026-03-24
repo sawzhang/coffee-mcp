@@ -1,0 +1,60 @@
+# Tea House — example second brand (demonstrates zero-code brand onboarding)
+brand_id: tea_house
+brand_name: "茶语轩"
+server_name: "茶语轩 ToC"
+default_user_id: "CC_M_100001"
+
+instructions: |
+  茶语轩消费者自助 MCP Server。
+  提供活动发现、优惠券领取、菜单浏览、门店查找、积分商城、下单点餐等能力。
+  Demo 模式，使用 Coffee Company 共享 mock 数据。
+
+validation:
+  phone_pattern: "^1\\d{10}$"
+  valid_sizes: ["regular", "large"]
+  valid_milks: ["whole", "oat", "coconut"]
+  valid_temps: ["hot", "iced"]
+  valid_extras: ["boba", "coconut_jelly", "red_bean", "pudding"]
+  valid_pickup: ["自提", "外送"]
+  max_quantity: 50
+  max_items_per_order: 10
+  max_addresses: 5
+
+rate_limits:
+  L0: { max_calls: 60, window_seconds: 60 }
+  L1: { max_calls: 30, window_seconds: 60 }
+  L2: { max_calls: 3,  window_seconds: 3600 }
+  L3: { max_calls: 5,  window_seconds: 86400 }
+
+size_options:
+  regular: { name: "常规",  extra_price: 0 }
+  large:   { name: "大杯",  extra_price: 3 }
+
+milk_options:
+  whole:   { name: "鲜奶",  extra_price: 0 }
+  oat:     { name: "燕麦奶", extra_price: 4 }
+  coconut: { name: "椰奶",  extra_price: 4 }
+
+temp_options:
+  hot:  { name: "热" }
+  iced: { name: "冰" }
+
+sweetness_options:
+  normal: { name: "正常糖" }
+  seven:  { name: "七分糖" }
+  half:   { name: "半糖" }
+  three:  { name: "三分糖" }
+  none:   { name: "不加糖" }
+
+extra_options:
+  boba:          { name: "珍珠",   price: 3 }
+  coconut_jelly: { name: "椰果",   price: 3 }
+  red_bean:      { name: "红豆",   price: 3 }
+  pudding:       { name: "布丁",   price: 4 }
+
+features:
+  campaigns: true
+  coupons: true
+  stars_mall: false
+  delivery: true
+  nutrition: true

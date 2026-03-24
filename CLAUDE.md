@@ -4,41 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Coffee Company MCP 开放平台，提供 **B2B** 和 **ToC** 两套 MCP Server：
+Multi-brand MCP platform for coffee & tea ordering, providing **B2B** and **ToC** servers:
 
-- **B2B Server** (`server.py`, 10 tools) — 面向合作伙伴 (蔚来/千问/飞猪)，通过 Kong 鉴权，客服/运营视角，需要传入 member_id
-- **ToC Server** (`toc_server.py`, 21 tools) — 面向消费者，用户 Token 自动识别身份，自助点单/领券/积分兑换
+- **B2B Server** (`server.py`, 10 tools) — 面向合作伙伴，通过 Kong 鉴权，客服/运营视角
+- **ToC Server** (`toc_server.py`, 21 tools) — 面向消费者，多品牌配置化，自助点单/领券/积分兑换
 
-Currently in demo mode with mock data. No real backend calls yet.
+**Multi-brand support:** Add a new brand by creating `brands/<brand_id>/brand.yaml` — zero code changes needed.
+Default brand: `coffee_company` (demo mode with mock data).
 
 ## Commands
 
 ```bash
 uv sync                                    # install deps
 uv run coffee-company-mcp                  # B2B MCP server (stdio)
-uv run coffee-company-toc                  # ToC MCP server (stdio)
+uv run coffee-company-toc                  # ToC MCP server (stdio, default brand)
+BRAND=tea_house uv run coffee-company-toc  # ToC server for another brand
+uv run coffee-company-toc-http             # ToC MCP server (Streamable HTTP)
 uv run coffee demo                         # 9-step B2B demo
 uv run coffee interactive                  # B2B REPL mode
 uv run coffee member CC_M_100001           # single B2B tool call
 ```
 
-Run the full MCP protocol test suite (33 cases: tools + resources + edge cases):
+Run the full test suites:
 ```bash
-uv run python tests/test_mcp_real.py
+uv run python tests/test_mcp_real.py       # B2B: 33 cases
+uv run python tests/test_toc_mcp.py        # ToC: 89 cases
 ```
 
 ## Architecture
 
 ```
 B2B Server (server.py)           ToC Server (toc_server.py)
-10 @mcp.tool() + 2 resources     21 @mcp.tool()
+10 @mcp.tool() + 2 resources     21 @mcp.tool() — multi-brand
     │                                 │
-    ├── mock_data.py                  ├── toc_mock_data.py (imports mock_data)
-    └── formatters.py                 └── toc_formatters.py
+    ├── mock_data.py                  ├── brand_config.py (YAML loader)
+    └── formatters.py                 ├── brand_adapter.py (ABC interface)
+                                      ├── demo_adapter.py (mock data adapter)
+                                      ├── toc_mock_data.py (mock data store)
+                                      ├── toc_formatters.py (markdown output)
+                                      └── utils.py (shared utilities)
 ```
 
 **B2B data flow:** MCP request → `server.py` → `mock_data.query_fn()` → `formatters.format_fn()` → markdown
-**ToC data flow:** MCP request → `toc_server.py` → `toc_mock_data.query_fn()` → `toc_formatters.format_fn()` → markdown
+**ToC data flow:** MCP request → `toc_server.py` → `BrandAdapter.method()` → `toc_formatters.format_fn()` → markdown
+
+**Multi-brand flow:**
+1. `brand_config.py` loads `brands/<brand_id>/brand.yaml`
+2. `create_toc_server(config, adapter)` builds a configured FastMCP server
+3. Validation rules, rate limits, menu options all come from YAML
+4. `DemoAdapter` wraps `toc_mock_data.py` for demo mode; production brands implement `BrandAdapter`
 
 **Key difference:** B2B tools require explicit `member_id`; ToC tools auto-resolve user from token (no ID params).
 
@@ -153,16 +167,26 @@ MCP Server 提供能力，Skills + Commands 提供体验。
     ├── coffee-menu/               #   ToC menu browse
     ├── coffee-stars/              #   ToC stars mall
     └── mcp-review/               #   MCP tool design review
+brands/                                # Brand configs (YAML-driven, zero code)
+├── coffee_company/
+│   └── brand.yaml                     #   Default demo brand
+└── tea_house/
+    └── brand.yaml                     #   Example second brand (茶语轩)
 docs/
-└── MCP_API_DESIGN_GUIDE.md        # MCP 接口设计准则（完整版）
+├── MCP_API_DESIGN_GUIDE.md            # MCP 接口设计准则（完整版）
+└── TOC_MCP_PLATFORM_DESIGN.md         # ToC 平台商业化方案
 src/coffee_mcp/
-├── server.py                      # B2B MCP Server (10 tools)
-├── toc_server.py                  # ToC MCP Server (18 tools)
-├── mock_data.py                   # B2B mock data
-├── toc_mock_data.py               # ToC mock data (stores, menu, orders, stars mall)
-├── formatters.py                  # B2B formatters
-├── toc_formatters.py              # ToC formatters
-├── cli.py                         # Click CLI + REPL
+├── server.py                          # B2B MCP Server (10 tools)
+├── toc_server.py                      # ToC MCP Server (21 tools, multi-brand factory)
+├── brand_config.py                    # BrandConfig dataclass + YAML loader
+├── brand_adapter.py                   # BrandAdapter ABC interface
+├── demo_adapter.py                    # DemoAdapter (mock data adapter)
+├── utils.py                           # Shared utilities (mask_phone, random_id)
+├── mock_data.py                       # B2B mock data
+├── toc_mock_data.py                   # ToC mock data store
+├── formatters.py                      # B2B formatters
+├── toc_formatters.py                  # ToC formatters
+├── cli.py                             # Click CLI + REPL
 └── __init__.py
 ```
 
@@ -172,3 +196,5 @@ src/coffee_mcp/
 - Python 3.13 union syntax (`str | None`, not `Optional[str]`)
 - Every tool returns a formatted markdown string, never raw JSON
 - `mock_data.py` functions mirror the real API response shapes — when replacing with real HTTP calls, keep the same return types
+- New brands: create `brands/<brand_id>/brand.yaml` with menu/validation/rate limits; no Python code needed
+- Production brands: implement `BrandAdapter` ABC in `brands/<brand_id>/adapter.py` for real HTTP calls
