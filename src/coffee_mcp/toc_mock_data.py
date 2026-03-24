@@ -6,14 +6,49 @@ replaced by HTTP calls to the consumer API behind user OAuth authentication.
 The default mock user is CC_M_100001 (张三, 金星级).
 """
 
-import hashlib
 import time
 import uuid
 
-from . import mock_data
-
 # Default mock user (simulates logged-in consumer)
 DEFAULT_USER_ID = "CC_M_100001"
+
+# ---------------------------------------------------------------------------
+# ToC User Data (decoupled from B2B mock_data)
+# In production: consumer backend resolves user from OAuth token
+# ---------------------------------------------------------------------------
+
+TIER_NAMES = {"GREEN": "银星级", "GOLD": "金星级", "DIAMOND": "钻星级"}
+TIER_THRESHOLDS = {"GREEN": 0, "GOLD": 125, "DIAMOND": 500}
+
+TOC_USERS = {
+    "CC_M_100001": {
+        "member_id": "CC_M_100001",
+        "name": "张三",
+        "member_tier": "GOLD",
+        "star_balance": 142,
+        "tier_expire_date": "2026-12-31",
+        "registration_date": "2024-06-15",
+    },
+}
+
+TOC_USER_BENEFITS = {
+    "CC_M_100001": {
+        "welcome_coupon": 3, "birthday_reward": 2, "tier_upgrade_reward": 3,
+        "free_drink_coupon": 2, "food_coupon": 1, "customization_coupon": 2,
+        "refill_benefit": 2, "early_access": 2,
+    },
+}
+
+TOC_USER_COUPONS = {
+    "CC_M_100001": [
+        {"coupon_no": "CN_100001_001", "name": "中杯饮品券", "type": "优惠券",
+         "status": "未使用", "valid_end": "2026-04-30", "face_value": 35.0},
+        {"coupon_no": "BEN_100001_001", "name": "生日免费饮品", "type": "权益券",
+         "status": "可使用", "valid_end": "2026-03-31", "face_value": 0.0},
+        {"coupon_no": "BEN_100001_002", "name": "好友邀请奖励", "type": "权益券",
+         "status": "可使用", "valid_end": "2026-12-31", "face_value": 30.0},
+    ],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -632,7 +667,7 @@ DELIVERY_ADDRESSES = {
 
 def get_current_user(user_id: str = DEFAULT_USER_ID) -> dict | None:
     """Resolve logged-in user. In production: from OAuth token."""
-    return mock_data.member_query(member_id=user_id)
+    return TOC_USERS.get(user_id)
 
 
 def my_account(user_id: str = DEFAULT_USER_ID) -> dict | None:
@@ -640,25 +675,36 @@ def my_account(user_id: str = DEFAULT_USER_ID) -> dict | None:
     user = get_current_user(user_id)
     if not user:
         return None
-    tier_info = mock_data.member_tier(user_id)
-    benefits = mock_data.member_benefits(user_id)
-    active_benefits = sum(1 for v in benefits.values() if v == 2) if benefits else 0
-    assets = mock_data.assets_list(user_id)
-    coupon_count = 0
-    if assets:
-        coupon_count = len(assets.get("upp_coupons", [])) + len(assets.get("benefit_coupons", []))
+    # Build tier info from ToC-local data
+    current_tier = user["member_tier"]
+    tiers = list(TIER_THRESHOLDS.keys())
+    idx = tiers.index(current_tier)
+    next_tier = tiers[idx + 1] if idx + 1 < len(tiers) else None
+    stars_to_next = (TIER_THRESHOLDS[next_tier] - user["star_balance"]) if next_tier else 0
+    tier_info = {
+        "member_tier": current_tier,
+        "tier_name": TIER_NAMES[current_tier],
+        "star_balance": user["star_balance"],
+        "tier_expire_date": user["tier_expire_date"],
+        "next_tier": next_tier,
+        "next_tier_name": TIER_NAMES.get(next_tier, ""),
+        "stars_to_next": max(0, stars_to_next),
+    }
+    benefits = TOC_USER_BENEFITS.get(user_id, {})
+    active_benefits = sum(1 for v in benefits.values() if v == 2)
+    coupons = TOC_USER_COUPONS.get(user_id, [])
     return {
         "name": user["name"],
         "tier_info": tier_info,
         "active_benefits": active_benefits,
-        "coupon_count": coupon_count,
+        "coupon_count": len(coupons),
         "registration_date": user["registration_date"],
     }
 
 
 def my_coupons(user_id: str = DEFAULT_USER_ID, status: str | None = None) -> list[dict]:
-    """User's coupon list. Combines B2B coupon + benefit data."""
-    items = mock_data.member_benefit_list(user_id)
+    """User's coupon list from ToC-local data."""
+    items = TOC_USER_COUPONS.get(user_id, [])
     if status == "valid":
         items = [i for i in items if i["status"] in ("未使用", "可使用")]
     elif status == "used":
