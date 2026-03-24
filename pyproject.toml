@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 coffee-company-mcp = "coffee_mcp.server:main"
+coffee-company-toc = "coffee_mcp.toc_server:main"
 coffee = "coffee_mcp.cli:cli"
 
 [build-system]

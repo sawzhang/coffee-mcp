@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "coffee-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", ".", "coffee-company-mcp"]
+    },
+    "coffee-toc": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", ".", "coffee-company-toc"]
+    }
+  }
+}
