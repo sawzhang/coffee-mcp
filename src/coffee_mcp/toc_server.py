@@ -119,12 +119,15 @@ def create_toc_server(config: BrandConfig, adapter: BrandAdapter) -> FastMCP:
 
     rate_limits = _build_rate_limits(config)
     val = config.validation
+    features = config.features
     phone_re = re.compile(val.phone_pattern)
     valid_sizes = set(val.valid_sizes)
     valid_milks = set(val.valid_milks)
     valid_extras = set(val.valid_extras)
     valid_pickup = set(val.valid_pickup)
     default_user = config.default_user_id
+
+    _FEATURE_NOT_AVAILABLE = "该品牌暂未开通此功能。"
 
     def _check_rate_limit(tool_name: str, user_id: str = default_user) -> str | None:
         level = _TOOL_RISK.get(tool_name, RiskLevel.L1_AUTH_READ)
@@ -333,6 +336,8 @@ def create_toc_server(config: BrandConfig, adapter: BrandAdapter) -> FastMCP:
         Args:
             category: 可选分类筛选
         """
+        if not features.get("stars_mall", True):
+            return _FEATURE_NOT_AVAILABLE
         products = adapter.stars_mall_products(category)
         user = adapter.get_current_user(default_user)
         user_stars = user["star_balance"] if user else 0
@@ -345,6 +350,8 @@ def create_toc_server(config: BrandConfig, adapter: BrandAdapter) -> FastMCP:
         Args:
             product_code: 积分商品编号
         """
+        if not features.get("stars_mall", True):
+            return _FEATURE_NOT_AVAILABLE
         product = adapter.stars_product_detail(product_code)
         if not product:
             return f"未找到积分商品 {product_code}。"
@@ -365,6 +372,8 @@ def create_toc_server(config: BrandConfig, adapter: BrandAdapter) -> FastMCP:
             product_code: 积分商品编号
             idempotency_key: 幂等键，防重复兑换
         """
+        if not features.get("stars_mall", True):
+            return _FEATURE_NOT_AVAILABLE
         if err := _check_rate_limit("stars_redeem"):
             return err
         result = adapter.stars_redeem(product_code, default_user,
