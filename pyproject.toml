@@ -15,6 +15,7 @@ dependencies = [
 coffee-company-mcp = "coffee_mcp.server:main"
 coffee-company-toc = "coffee_mcp.toc_server:main"
 coffee-company-toc-http = "coffee_mcp.toc_server:main_http"
+brand-init = "coffee_mcp.brand_init:init"
 coffee = "coffee_mcp.cli:cli"
 
 [build-system]
